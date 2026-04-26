@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESTATE PRO v44.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-slate-900 text-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-indigo-400 mb-2">ESTATE PRO v44.0</h1>
+            <div class="flex flex-wrap gap-3">
+                <button onclick="syncData()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-semibold">
+                    🔄 同步最新數據
+                </button>
+                <label class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold cursor-pointer">
+                    📁 上傳 CSV
+                    <input type="file" accept=".csv" multiple onchange="handleFileUpload(event)" class="hidden">
+                </label>
+                <button onclick="clearData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold">
+                    🗑️ 清除資料
+                </button>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold mb-2">區域 (多選)</label>
+                    <select id="districtFilter" multiple class="w-full bg-slate-700 rounded-lg px-3 py-2 h-32">
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">房型</label>
+                    <select id="roomFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2">
+                        <option value="">全部</option>
+                        <option value="1">1房</option>
+                        <option value="2">2房</option>
+                        <option value="3">3房</option>
+                        <option value="4">4房+</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">屋齡 (中古)</label>
+                    <select id="ageFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2">
+                        <option value="">全部</option>
+                        <option value="5">5年內</option>
+                        <option value="10">10年內</option>
+                        <option value="20">20年內</option>
+                        <option value="99">全部中古</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-2">日期區間</label>
+                    <input type="month" id="dateStart" class="w-full bg-slate-700 rounded-lg px-3 py-2 mb-2">
+                    <input type="month" id="dateEnd" class="w-full bg-slate-700 rounded-lg px-3 py-2">
+                </div>
+            </div>
+            <button onclick="applyFilters()" class="mt-4 bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg font-semibold w-full md:w-auto">
+                套用篩選
+            </button>
+        </div>
+
+        <!-- Rankings Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="bg-slate-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4">🏆 區域均總價排行</h2>
+                <div id="districtRanking" class="space-y-2"></div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4">🏢 指標建案均價排行</h2>
+                <div id="projectRanking" class="space-y-2"></div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4">🔥 交易熱度區域</h2>
+                <div id="hotDistrict" class="space-y-2"></div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-400 mb-4">📊 建案銷售量榜</h2>
+                <div id="projectVolume" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="bg-gradient-to-r from-indigo-900 to-slate-800 rounded-xl p-6 shadow-xl">
+            <h2 class="text-xl font-bold text-indigo-300 mb-4">🤖 AI 數據洞察</h2>
+            <div id="aiInsights" class="text-gray-300 leading-relaxed"></div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="mt-6 text-center text-sm text-gray-500"></div>
+    </div>
+
+    <script>
+        let db;
+        let allData = [];
+        let filteredData = [];
+        const GITHUB_PRESALE = 'https://raw.githubusercontent.com/estate-pro-data/v44/main/presale.csv';
+        const GITHUB_RESALE = 'https://raw.githubusercontent.com/estate-pro-data/v44/main/resale.csv';
+
+        // Initialize IndexedDB
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('EstateProDB', 1);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('transactions')) {
+                        const store = db.createObjectStore('transactions', { keyPath: 'uid' });
+                        store.createIndex('district', 'district', { unique: false });
+                        store.createIndex('date', 'date', { unique: false });
+                    }
+                };
+            });
+        }
+
+        // Generate unique ID
+        function generateUID(row) {
+            const id = row.rps26 || row.rps27;
+            if (id) return id;
+            const str = `${row.rps03}_${row.rps05}_${row.rps08}_${row.rps09}`;
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return 'hash_' + hash;
+        }
+
+        // Parse and clean data
+        function parseRow(row) {
+            const price = parseFloat(row.rps08) || 0;
+            const rooms = parseInt(row.rps16) || 0;
+            const usage = row.rps12 || '';
+            const age = parseInt(row.rps18) || 0;
+            
+            // Filter: 住家用 only, outlier removal
+            if (!usage.includes('住家用')) return null;
+            if (price > 10000 && rooms <= 2) return null;
+            
+            return {
+                uid: generateUID(row),
+                district: row.rps03 || '',
+                date: row.rps05 || '',
+                price: price,
+                unitPrice: parseFloat(row.rps09) || 0,
+                rooms: rooms,
+                age: age,
+                project: row.rps10 || '未命名',
+                location: row.rps11 || '',
+                usage: usage
+            };
+        }
+
+        // Save to IndexedDB with deduplication
+        async function saveToDB(records) {
+            const tx = db.transaction(['transactions'], 'readwrite');
+            const store = tx.objectStore('transactions');
+            let saved = 0;
+            for (const record of records) {
+                if (record) {
+                    await store.put(record);
+                    saved++;
+                }
+            }
+            await tx.complete;
+            return saved;
+        }
+
+        // Load all data from IndexedDB
+        async function loadFromDB() {
+            const tx = db.transaction(['transactions'], 'readonly');
+            const store = tx.objectStore('transactions');
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // Fetch and parse CSV
+        async function fetchCSV(url) {
+            setStatus('載入中...');
+            const response = await fetch(url);
+            const text = await response.text();
+            return new Promise((resolve) => {
+                Papa.parse(text, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => resolve(results.data)
+                });
+            });
+        }
+
+        // Sync data from GitHub
+        async function syncData() {
+            try {
+                setStatus('🔄 同步數據中...');
+                const [presale, resale] = await Promise.all([
+                    fetchCSV(GITHUB_PRESALE),
+                    fetchCSV(GITHUB_RESALE)
+                ]);
+                const combined = [...presale, ...resale];
+                const parsed = combined.map(parseRow).filter(r => r);
+                const saved = await saveToDB(parsed);
+                allData = await loadFromDB();
+                populateFilters();
+                applyFilters();
+                setStatus(`✅ 已同步 ${saved} 筆資料`);
+            } catch (error) {
+                setStatus('❌ 同步失敗: ' + error.message);
+            }
+        }
+
+        // Handle file upload
+        async function handleFileUpload(event) {
+            const files = event.target.files;
+            let allRecords = [];
+            for (const file of files) {
+                const text = await file.text();
+                const parsed = await new Promise(resolve => {
+                    Papa.parse(text, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => resolve(results.data)
+                    });
+                });
+                allRecords.push(...parsed.map(parseRow).filter(r => r));
+            }
+            const saved = await saveToDB(allRecords);
+            allData = await loadFromDB();
+            populateFilters();
+            applyFilters();
+            setStatus(`✅ 已上傳 ${saved} 筆資料`);
+        }
+
+        // Clear all data
+        async function clearData() {
+            if (!confirm('確定要清除所有資料？')) return;
+            const tx = db.transaction(['transactions'], 'readwrite');
+            await tx.objectStore('transactions').clear();
+            allData = [];
+            filteredData = [];
+            populateFilters();
+            applyFilters();
+            setStatus('✅ 已清除所有資料');
+        }
+
+        // Populate filter options
+        function populateFilters() {
+            const districts = [...new Set(allData.map(r => r.district))].sort();
+            const districtSelect = document.getElementById('districtFilter');
+            districtSelect.innerHTML = districts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const selectedDistricts = Array.from(document.getElementById('districtFilter').selectedOptions).map(o => o.value);
+            const roomFilter = document.getElementById('roomFilter').value;
+            const ageFilter = document.getElementById('ageFilter').value;
+            const dateStart = document.getElementById('dateStart').value;
+            const dateEnd = document.getElementById('dateEnd').value;
+
+            filteredData = allData.filter(r => {
+                if (selectedDistricts.length && !selectedDistricts.includes(r.district)) return false;
+                if (roomFilter && r.rooms != roomFilter && !(roomFilter == '4' && r.rooms >= 4)) return false;
+                if (ageFilter && r.age > parseInt(ageFilter)) return false;
+                if (dateStart && r.date < dateStart.replace('-', '')) return false;
+                if (dateEnd && r.date > dateEnd.replace('-', '')) return false;
+                return true;
+            });
+
+            renderRankings();
+            runAIAnalysis();
+            setStatus(`✅ 篩選結果: ${filteredData.length} 筆`);
+        }
+
+        // Render rankings
+        function renderRankings() {
+            // 1. District avg price
+            const districtStats = {};
+            filteredData.forEach(r => {
+                if (!districtStats[r.district]) districtStats[r.district] = { sum: 0, count: 0 };
+                districtStats[r.district].sum += r.price;
+                districtStats[r.district].count++;
+            });
+            const districtRanking = Object.entries(districtStats)
+                .map(([d, s]) => ({ district: d, avg: s.sum / s.count }))
+                .sort((a, b) => b.avg - a.avg)
+                .slice(0, 10);
+            document.getElementById('districtRanking').innerHTML = districtRanking
+                .map((item, i) => `
+                    <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
+                        <span class="font-semibold">${i + 1}. ${item.district}</span>
+                        <span class="text-indigo-400 font-bold">${item.avg.toFixed(0)} 萬</span>
+                    </div>
+                `).join('');
+
+            // 2. Project avg price
+            const projectStats = {};
+            filteredData.forEach(r => {
+                if (!projectStats[r.project]) projectStats[r.project] = { sum: 0, count: 0 };
+                projectStats[r.project].sum += r.price;
+                projectStats[r.project].count++;
+            });
+            const projectRanking = Object.entries(projectStats)
+                .map(([p, s]) => ({ project: p, avg: s.sum / s.count }))
+                .sort((a, b) => b.avg - a.avg)
+                .slice(0, 10);
+            document.getElementById('projectRanking').innerHTML = projectRanking
+                .map((item, i) => `
+                    <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
+                        <span class="font-semibold text-sm">${i + 1}. ${item.project}</span>
+                        <span class="text-indigo-400 font-bold">${item.avg.toFixed(0)} 萬</span>
+                    </div>
+                `).join('');
+
+            // 3. Hot districts (volume)
+            const districtVolume = {};
+            filteredData.forEach(r => {
+                districtVolume[r.district] = (districtVolume[r.district] || 0) + 1;
+            });
+            const hotDistricts = Object.entries(districtVolume)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            document.getElementById('hotDistrict').innerHTML = hotDistricts
+                .map((item, i) => `
+                    <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
+                        <span class="font-semibold">${i + 1}. ${item[0]}</span>
+                        <span class="text-red-400 font-bold">${item[1]} 筆</span>
+                    </div>
+                `).join('');
+
+            // 4. Project volume
+            const projectVolume = {};
+            filteredData.forEach(r => {
+                projectVolume[r.project] = (projectVolume[r.project] || 0) + 1;
+            });
+            const topProjects = Object.entries(projectVolume)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            document.getElementById('projectVolume').innerHTML = topProjects
+                .map((item, i) => `
+                    <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
+                        <span class="font-semibold text-sm">${i + 1}. ${item[0]}</span>
+                        <span class="text-green-400 font-bold">${item[1]} 筆</span>
+                    </div>
+                `).join('');
+        }
+
+        // AI Analysis
+        function runAIAnalysis() {
+            if (!filteredData.length) {
+                document.getElementById('aiInsights').innerHTML = '無足夠數據進行分析';
+                return;
+            }
+
+            const avgPrice = filteredData.reduce((sum, r) => sum + r.price, 0) / filteredData.length;
+            const topDistrict = Object.entries(filteredData.reduce((acc, r) => {
+                acc[r.district] = (acc[r.district] || 0) + 1;
+                return acc;
+            }, {})).sort((a, b) => b[1] - a[1])[0];
+
+            const topProject = Object.entries(filteredData.reduce((acc, r) => {
+                if (!acc[r.project]) acc[r.project] = { sum: 0, count: 0 };
+                acc[r.project].sum += r.price;
+                acc[r.project].count++;
+                return acc;
+            }, {})).map(([p, s]) => ({ project: p, avg: s.sum / s.count }))
+                .sort((a, b) => b.avg - a.avg)[0];
+
+            const insights = `
+                <p class="mb-3">📊 <strong>篩選條件分析：</strong></p>
+                <ul class="list-disc list-inside space-y-2 ml-4">
+                    <li>共 <strong class="text-indigo-300">${filteredData.length}</strong> 筆交易資料符合條件</li>
+                    <li>平均總價為 <strong class="text-green-400">${avgPrice.toFixed(0)} 萬元</strong></li>
+                    <li>交易最熱門區域為 <strong class="text-yellow-400">${topDistrict[0]}</strong>，共 ${topDistrict[1]} 筆交易</li>
+                    <li>表現最強建案為 <strong class="text-purple-400">${topProject.project}</strong>，平均成交價 ${topProject.avg.toFixed(0)} 萬元</li>
+                    <li>市場趨勢：${avgPrice > 2000 ? '高總價產品仍有強勁需求' : '中低總價產品為市場主力'}</li>
+                </ul>
+            `;
+            document.getElementById('aiInsights').innerHTML = insights;
+        }
+
+        // Set status message
+        function setStatus(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        // Initialize
+        (async () => {
+            db = await initDB();
+            allData = await loadFromDB();
+            populateFilters();
+            if (allData.length === 0) {
+                setStatus('請點擊「同步最新數據」或上傳 CSV 檔案');
+            } else {
+                applyFilters();
+                setStatus(`已載入 ${allData.length} 筆資料`);
+            }
+        })();
+    </script>
+</body>
+</html>
