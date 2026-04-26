@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESTATE PRO v45.0</title>
+    <title>ESTATE PRO v45.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -11,55 +11,101 @@
 <body class="bg-slate-900 text-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-6 max-w-7xl">
         <div class="mb-6">
-            <h1 class="text-3xl font-bold text-indigo-400 mb-4">ESTATE PRO v45.0</h1>
+            <h1 class="text-3xl font-bold text-indigo-400 mb-4">ESTATE PRO v45.1</h1>
             <div class="flex flex-wrap gap-3">
-                <button onclick="syncData()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-semibold">🔄 同步</button>
+                <button onclick="syncData()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-semibold">🔄 同步數據</button>
                 <label class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg font-semibold cursor-pointer">
-                    📁 上傳
-                    <input type="file" id="fileInput" accept=".csv" multiple onchange="handleFileUpload(event)" class="hidden">
+                    📁 上傳 CSV
+                    <input type="file" id="fileInput" accept=".csv" multiple class="hidden">
                 </label>
                 <button onclick="clearData()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold">🗑️ 清除</button>
             </div>
         </div>
 
-        <div class="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-xl p-6 mb-6 shadow-xl">
-            <h2 class="text-2xl font-bold text-purple-300 mb-3">🤖 AI 市場摘要</h2>
-            <div id="aiSummary" class="text-gray-200 text-lg"></div>
+        <!-- Tab Navigation -->
+        <div class="flex gap-2 mb-6 border-b border-slate-700">
+            <button onclick="switchTab('presale')" id="tabPresale" class="px-6 py-3 font-semibold rounded-t-lg bg-indigo-600 text-white">預售屋</button>
+            <button onclick="switchTab('resale')" id="tabResale" class="px-6 py-3 font-semibold rounded-t-lg bg-slate-800 text-gray-400">中古屋</button>
         </div>
 
-        <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-xl">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div><label class="block text-sm font-semibold mb-2">區域</label><select id="districtFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全區域</option></select></div>
-                <div><label class="block text-sm font-semibold mb-2">類型</label><select id="typeFilter" onchange="updateTypeFilters()" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="presale">預售</option><option value="resale">中古</option></select></div>
-                <div id="projectFilterDiv" style="display:none;"><label class="block text-sm font-semibold mb-2">建案</label><select id="projectFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option></select></div>
-                <div id="ageFilterDiv" style="display:none;"><label class="block text-sm font-semibold mb-2">屋齡</label><select id="ageFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="5">5年內</option><option value="10">10年內</option><option value="20">20年內</option></select></div>
-                <div><label class="block text-sm font-semibold mb-2">房型</label><select id="roomFilter" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="1">1房</option><option value="2">2房</option><option value="3">3房</option><option value="4">4房+</option></select></div>
+        <!-- Presale Tab -->
+        <div id="contentPresale">
+            <div class="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-xl p-6 mb-6 shadow-xl">
+                <h2 class="text-2xl font-bold text-purple-300 mb-3">🤖 預售屋市場摘要</h2>
+                <div id="aiSummaryPresale" class="text-gray-200 text-lg"></div>
             </div>
-            <button onclick="applyFilters()" class="mt-4 bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg font-semibold">套用</button>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 每月銷售量</h3><canvas id="volumeChart"></canvas></div>
-            <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">💰 每月均價</h3><canvas id="priceChart"></canvas></div>
-            <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="pieChartDiv"><h3 class="text-xl font-bold text-indigo-400 mb-4">🥧 區域佔比</h3><canvas id="pieChart"></canvas></div>
-            <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="barChartDiv"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 區域均價</h3><canvas id="barChart"></canvas></div>
-        </div>
-
-        <div class="mb-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-bold text-indigo-400">🏆 TOP 5</h2>
-                <div class="flex gap-3"><input type="month" id="top5StartDate" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><input type="month" id="top5EndDate" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><button onclick="updateTop5()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold">更新</button></div>
+            <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-xl">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div><label class="block text-sm font-semibold mb-2">區域</label><select id="districtFilterPresale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全區域</option></select></div>
+                    <div><label class="block text-sm font-semibold mb-2">建案</label><select id="projectFilterPresale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option></select></div>
+                    <div><label class="block text-sm font-semibold mb-2">房型</label><select id="roomFilterPresale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="1">1房</option><option value="2">2房</option><option value="3">3房</option><option value="4">4房+</option></select></div>
+                    <div class="flex items-end"><button onclick="applyFiltersPresale()" class="w-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg font-semibold">套用</button></div>
+                </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-yellow-400 mb-4">🔥 預售量</h3><div id="top5PresaleVolume"></div></div>
-                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-green-400 mb-4">💎 預售價</h3><div id="top5PresalePrice"></div></div>
-                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-purple-400 mb-4">🏠 中古價</h3><div id="top5ResalePrice"></div></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 每月銷售量</h3><canvas id="volumeChartPresale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">💰 每月均價</h3><canvas id="priceChartPresale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="pieChartDivPresale"><h3 class="text-xl font-bold text-indigo-400 mb-4">🥧 區域佔比</h3><canvas id="pieChartPresale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="barChartDivPresale"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 區域均價</h3><canvas id="barChartPresale"></canvas></div>
+            </div>
+
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-indigo-400">🏆 TOP 5 預售屋</h2>
+                    <div class="flex gap-3"><input type="month" id="top5StartDatePresale" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><input type="month" id="top5EndDatePresale" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><button onclick="updateTop5Presale()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold">更新</button></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-yellow-400 mb-4">🔥 銷售量 TOP5</h3><div id="top5PresaleVolume"></div></div>
+                    <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-green-400 mb-4">💎 單價 TOP5</h3><div id="top5PresalePrice"></div></div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-indigo-900 to-slate-800 rounded-xl p-6 mb-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-300 mb-4">📈 深度分析</h2>
+                <div id="deepAnalysisPresale"></div>
             </div>
         </div>
 
-        <div class="bg-gradient-to-r from-indigo-900 to-slate-800 rounded-xl p-6 mb-6 shadow-xl">
-            <h2 class="text-xl font-bold text-indigo-300 mb-4">📈 深度分析</h2>
-            <div id="deepAnalysis"></div>
+        <!-- Resale Tab -->
+        <div id="contentResale" style="display:none;">
+            <div class="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-xl p-6 mb-6 shadow-xl">
+                <h2 class="text-2xl font-bold text-purple-300 mb-3">🤖 中古屋市場摘要</h2>
+                <div id="aiSummaryResale" class="text-gray-200 text-lg"></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 mb-6 shadow-xl">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div><label class="block text-sm font-semibold mb-2">區域</label><select id="districtFilterResale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全區域</option></select></div>
+                    <div><label class="block text-sm font-semibold mb-2">屋齡</label><select id="ageFilterResale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="5">5年內</option><option value="10">10年內</option><option value="20">20年內</option></select></div>
+                    <div><label class="block text-sm font-semibold mb-2">房型</label><select id="roomFilterResale" class="w-full bg-slate-700 rounded-lg px-3 py-2"><option value="">全部</option><option value="1">1房</option><option value="2">2房</option><option value="3">3房</option><option value="4">4房+</option></select></div>
+                    <div class="flex items-end"><button onclick="applyFiltersResale()" class="w-full bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-lg font-semibold">套用</button></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 每月銷售量</h3><canvas id="volumeChartResale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-xl font-bold text-indigo-400 mb-4">💰 每月均價</h3><canvas id="priceChartResale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="pieChartDivResale"><h3 class="text-xl font-bold text-indigo-400 mb-4">🥧 區域佔比</h3><canvas id="pieChartResale"></canvas></div>
+                <div class="bg-slate-800 rounded-xl p-6 shadow-xl" id="barChartDivResale"><h3 class="text-xl font-bold text-indigo-400 mb-4">📊 區域均價</h3><canvas id="barChartResale"></canvas></div>
+            </div>
+
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-indigo-400">🏆 TOP 5 中古屋</h2>
+                    <div class="flex gap-3"><input type="month" id="top5StartDateResale" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><input type="month" id="top5EndDateResale" class="bg-slate-700 rounded-lg px-3 py-2 text-sm"><button onclick="updateTop5Resale()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg text-sm font-semibold">更新</button></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-yellow-400 mb-4">🔥 區域交易量 TOP5</h3><div id="top5ResaleVolume"></div></div>
+                    <div class="bg-slate-800 rounded-xl p-6 shadow-xl"><h3 class="text-lg font-bold text-purple-400 mb-4">💎 路段單價 TOP5</h3><div id="top5ResalePrice"></div></div>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-indigo-900 to-slate-800 rounded-xl p-6 mb-6 shadow-xl">
+                <h2 class="text-xl font-bold text-indigo-300 mb-4">📈 深度分析</h2>
+                <div id="deepAnalysisResale"></div>
+            </div>
         </div>
 
         <div class="bg-slate-800 rounded-xl p-4 text-center text-sm text-gray-400"><div id="dataInfo"></div></div>
@@ -67,53 +113,54 @@
     </div>
 
     <script>
-        let db,allData=[],filteredData=[],charts={};
+        let db,presaleData=[],resaleData=[],filteredPresale=[],filteredResale=[],charts={};
         const GITHUB_PRESALE='https://raw.githubusercontent.com/pickymiao/estate_dashboard/main/presale.csv';
         const GITHUB_RESALE='https://raw.githubusercontent.com/pickymiao/estate_dashboard/main/resale.csv';
+        let currentTab='presale';
 
-        async function initDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open('EstateProDB',2);request.onerror=()=>reject(request.error);request.onsuccess=()=>resolve(request.result);request.onupgradeneeded=(e)=>{const db=e.target.result;if(!db.objectStoreNames.contains('transactions')){const store=db.createObjectStore('transactions',{keyPath:'uid'});store.createIndex('district','district',{unique:false});store.createIndex('date','date',{unique:false});store.createIndex('type','type',{unique:false});}};});}
+        async function initDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open('EstateProDB',3);request.onerror=()=>reject(request.error);request.onsuccess=()=>resolve(request.result);request.onupgradeneeded=(e)=>{const db=e.target.result;['presale','resale'].forEach(type=>{if(db.objectStoreNames.contains(type)){db.deleteObjectStore(type);}const store=db.createObjectStore(type,{keyPath:'uid'});store.createIndex('district','district',{unique:false});store.createIndex('date','date',{unique:false});});};});}
 
-        function generateUID(row,type){const id=row.rps26||row.rps27;if(id)return type+'_'+id;const str=`${row.district}_${row.rps05}_${row.rps21_amountsunitdollars}_${type}`;let hash=0;for(let i=0;i<str.length;i++){hash=((hash<<5)-hash)+str.charCodeAt(i);hash|=0;}return 'hash_'+type+'_'+hash;}
+        function parsePresale(row){const usage=row.rps12||'';if(!usage.includes('住家用'))return null;const price=parseFloat(row.rps21_amountsunitdollars)/10000||0;const unitPrice=parseFloat(row.rps22_amountsunitdollars)/10000||0;const rooms=parseInt(row.rps16_quantity)||0;if(price>10000&&rooms<=2)return null;const uid=row.rps26||`${row.district}_${row.rps05}_${row.rps21_amountsunitdollars}_${Math.random()}`;return{uid,district:row.district||'',date:row.rps05||'',price,unitPrice,rooms,age:0,project:row.rps27||'未命名',location:row.rps03_area||''};}
 
-        function parseRow(row,type){const price=parseFloat(row.rps21_amountsunitdollars)/10000||0;const unitPrice=parseFloat(row.rps22_amountsunitdollars)/10000||0;const rooms=parseInt(row.rps16_quantity)||0;const usage=row.rps12||'';const age=parseInt(row.rps18_quantity)||0;if(!usage.includes('住家用'))return null;if(price>10000&&rooms<=2)return null;return{uid:generateUID(row,type),type:type,district:row.district||'',date:row.rps05||'',price:price,unitPrice:unitPrice,rooms:rooms,age:age,project:row.rps27||'未命名',location:row.rps03_area||'',usage:usage};}
+        function parseResale(row){const usage=row.rps12||'';if(!usage.includes('住家用'))return null;const price=parseFloat(row.rps21_amountsunitdollars)/10000||0;const unitPrice=parseFloat(row.rps22_amountsunitdollars)/10000||0;const rooms=parseInt(row.rps16_quantity)||0;const age=parseInt(row.rps18_quantity)||0;if(price>10000&&rooms<=2)return null;const uid=row.rps26||`${row.district}_${row.rps05}_${row.rps21_amountsunitdollars}_${Math.random()}`;return{uid,district:row.district||'',date:row.rps05||'',price,unitPrice,rooms,age,location:row.rps03_area||''};}
 
-        async function saveToDB(records){const tx=db.transaction(['transactions'],'readwrite');const store=tx.objectStore('transactions');let saved=0;for(const record of records){if(record){await store.put(record);saved++;}}return saved;}
+        async function saveToDB(records,type){const tx=db.transaction([type],'readwrite');const store=tx.objectStore(type);let saved=0;for(const record of records){if(record){await store.put(record);saved++;}}return saved;}
 
-        async function loadFromDB(){const tx=db.transaction(['transactions'],'readonly');const store=tx.objectStore('transactions');return new Promise((resolve,reject)=>{const request=store.getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+        async function loadFromDB(type){const tx=db.transaction([type],'readonly');const store=tx.objectStore(type);return new Promise((resolve,reject)=>{const request=store.getAll();request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
 
         async function fetchCSV(url){const response=await fetch(url);const text=await response.text();return new Promise((resolve)=>{Papa.parse(text,{header:true,skipEmptyLines:true,complete:(results)=>resolve(results.data)});});}
 
-        async function syncData(){try{setStatus('🔄 同步中...');const[presale,resale]=await Promise.all([fetchCSV(GITHUB_PRESALE),fetchCSV(GITHUB_RESALE)]);const presaleParsed=presale.map(r=>parseRow(r,'presale')).filter(r=>r);const resaleParsed=resale.map(r=>parseRow(r,'resale')).filter(r=>r);const saved=await saveToDB([...presaleParsed,...resaleParsed]);allData=await loadFromDB();populateFilters();applyFilters();setStatus(`✅ ${saved} 筆`);}catch(error){setStatus('❌ 失敗');}}
+        async function syncData(){try{setStatus('🔄 同步中...');const[presale,resale]=await Promise.all([fetchCSV(GITHUB_PRESALE),fetchCSV(GITHUB_RESALE)]);const presaleParsed=presale.map(parsePresale).filter(r=>r);const resaleParsed=resale.map(parseResale).filter(r=>r);const savedPresale=await saveToDB(presaleParsed,'presale');const savedResale=await saveToDB(resaleParsed,'resale');presaleData=await loadFromDB('presale');resaleData=await loadFromDB('resale');populateFilters();applyFiltersPresale();applyFiltersResale();setStatus(`✅ 預售 ${savedPresale} / 中古 ${savedResale}`);}catch(error){setStatus('❌ '+error.message);}}
 
-        async function handleFileUpload(event){const files=event.target.files;let allRecords=[];for(const file of files){const text=await file.text();const parsed=await new Promise(resolve=>{Papa.parse(text,{header:true,skipEmptyLines:true,complete:(results)=>resolve(results.data)});});const type=file.name.includes('presale')?'presale':'resale';allRecords.push(...parsed.map(r=>parseRow(r,type)).filter(r=>r));}const saved=await saveToDB(allRecords);allData=await loadFromDB();populateFilters();applyFilters();setStatus(`✅ ${saved} 筆`);document.getElementById('fileInput').value='';}
+        document.getElementById('fileInput').addEventListener('change',async(event)=>{const files=event.target.files;for(const file of files){const text=await file.text();const parsed=await new Promise(resolve=>{Papa.parse(text,{header:true,skipEmptyLines:true,complete:(results)=>resolve(results.data)});});if(file.name.includes('presale')){const presaleParsed=parsed.map(parsePresale).filter(r=>r);const saved=await saveToDB(presaleParsed,'presale');presaleData=await loadFromDB('presale');setStatus(`✅ 預售 ${saved}`);}else{const resaleParsed=parsed.map(parseResale).filter(r=>r);const saved=await saveToDB(resaleParsed,'resale');resaleData=await loadFromDB('resale');setStatus(`✅ 中古 ${saved}`);}}populateFilters();applyFiltersPresale();applyFiltersResale();event.target.value='';});
 
-        async function clearData(){if(!confirm('確定清除？'))return;const tx=db.transaction(['transactions'],'readwrite');await tx.objectStore('transactions').clear();allData=[];filteredData=[];populateFilters();applyFilters();setStatus('✅ 已清除');}
+        async function clearData(){if(!confirm('確定清除？'))return;const tx=db.transaction(['presale','resale'],'readwrite');await tx.objectStore('presale').clear();await tx.objectStore('resale').clear();presaleData=[];resaleData=[];populateFilters();applyFiltersPresale();applyFiltersResale();setStatus('✅ 已清除');}
 
-        function populateFilters(){const districts=[...new Set(allData.map(r=>r.district))].sort();const projects=[...new Set(allData.filter(r=>r.type==='presale'&&r.project!=='未命名').map(r=>r.project))].sort();document.getElementById('districtFilter').innerHTML='<option value="">全區域</option>'+districts.map(d=>`<option value="${d}">${d}</option>`).join('');document.getElementById('projectFilter').innerHTML='<option value="">全部</option>'+projects.map(p=>`<option value="${p}">${p}</option>`).join('');}
+        function populateFilters(){const districtsP=[...new Set(presaleData.map(r=>r.district))].sort();const districtsR=[...new Set(resaleData.map(r=>r.district))].sort();const projects=[...new Set(presaleData.filter(r=>r.project!=='未命名').map(r=>r.project))].sort();document.getElementById('districtFilterPresale').innerHTML='<option value="">全區域</option>'+districtsP.map(d=>`<option value="${d}">${d}</option>`).join('');document.getElementById('districtFilterResale').innerHTML='<option value="">全區域</option>'+districtsR.map(d=>`<option value="${d}">${d}</option>`).join('');document.getElementById('projectFilterPresale').innerHTML='<option value="">全部</option>'+projects.map(p=>`<option value="${p}">${p}</option>`).join('');}
 
-        function updateTypeFilters(){const type=document.getElementById('typeFilter').value;document.getElementById('projectFilterDiv').style.display=type==='presale'?'block':'none';document.getElementById('ageFilterDiv').style.display=type==='resale'?'block':'none';}
+        function switchTab(tab){currentTab=tab;document.getElementById('contentPresale').style.display=tab==='presale'?'block':'none';document.getElementById('contentResale').style.display=tab==='resale'?'block':'none';document.getElementById('tabPresale').className=tab==='presale'?'px-6 py-3 font-semibold rounded-t-lg bg-indigo-600 text-white':'px-6 py-3 font-semibold rounded-t-lg bg-slate-800 text-gray-400';document.getElementById('tabResale').className=tab==='resale'?'px-6 py-3 font-semibold rounded-t-lg bg-indigo-600 text-white':'px-6 py-3 font-semibold rounded-t-lg bg-slate-800 text-gray-400';}
 
-        function applyFilters(){const district=document.getElementById('districtFilter').value;const type=document.getElementById('typeFilter').value;const project=document.getElementById('projectFilter').value;const age=document.getElementById('ageFilter').value;const rooms=document.getElementById('roomFilter').value;filteredData=allData.filter(r=>{if(district&&r.district!==district)return false;if(type&&r.type!==type)return false;if(project&&r.project!==project)return false;if(age&&r.age>parseInt(age))return false;if(rooms&&r.rooms!=rooms&&!(rooms=='4'&&r.rooms>=4))return false;return true;});renderCharts();updateTop5();runAIAnalysis();updateDataInfo();setStatus(`✅ ${filteredData.length} 筆`);}
+        function applyFiltersPresale(){const district=document.getElementById('districtFilterPresale').value;const project=document.getElementById('projectFilterPresale').value;const rooms=document.getElementById('roomFilterPresale').value;filteredPresale=presaleData.filter(r=>{if(district&&r.district!==district)return false;if(project&&r.project!==project)return false;if(rooms&&r.rooms!=rooms&&!(rooms=='4'&&r.rooms>=4))return false;return true;});renderChartsPresale();updateTop5Presale();runAIAnalysisPresale();updateDataInfo();setStatus(`✅ 預售 ${filteredPresale.length} 筆`);}
 
-        function renderCharts(){const district=document.getElementById('districtFilter').value;document.getElementById('pieChartDiv').style.display=district?'none':'block';document.getElementById('barChartDiv').style.display=district?'none':'block';renderVolumeChart();renderPriceChart();if(!district){renderPieChart();renderBarChart();}}
+        function applyFiltersResale(){const district=document.getElementById('districtFilterResale').value;const age=document.getElementById('ageFilterResale').value;const rooms=document.getElementById('roomFilterResale').value;filteredResale=resaleData.filter(r=>{if(district&&r.district!==district)return false;if(age&&r.age>parseInt(age))return false;if(rooms&&r.rooms!=rooms&&!(rooms=='4'&&r.rooms>=4))return false;return true;});renderChartsResale();updateTop5Resale();runAIAnalysisResale();updateDataInfo();setStatus(`✅ 中古 ${filteredResale.length} 筆`);}
 
-        function renderVolumeChart(){const ctx=document.getElementById('volumeChart');if(charts.volume)charts.volume.destroy();const monthlyData={};filteredData.forEach(r=>{const month=r.date.substring(0,6);if(!monthlyData[month])monthlyData[month]={presale:0,resale:0};monthlyData[month][r.type]++;});const months=Object.keys(monthlyData).sort();charts.volume=new Chart(ctx,{type:'line',data:{labels:months,datasets:[{label:'預售',data:months.map(m=>monthlyData[m].presale),borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,0.1)'},{label:'中古',data:months.map(m=>monthlyData[m].resale),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.1)'}]},options:{responsive:true,maintainAspectRatio:true}});}
+        function renderChartsPresale(){const district=document.getElementById('districtFilterPresale').value;document.getElementById('pieChartDivPresale').style.display=district?'none':'block';document.getElementById('barChartDivPresale').style.display=district?'none':'block';const monthlyData={};filteredPresale.forEach(r=>{const month=r.date.substring(0,6);if(!monthlyData[month])monthlyData[month]={count:0,sum:0,cnt:0};monthlyData[month].count++;monthlyData[month].sum+=r.unitPrice;monthlyData[month].cnt++;});const months=Object.keys(monthlyData).sort();const ctx1=document.getElementById('volumeChartPresale');if(charts.volumePresale)charts.volumePresale.destroy();charts.volumePresale=new Chart(ctx1,{type:'line',data:{labels:months,datasets:[{label:'預售量',data:months.map(m=>monthlyData[m].count),borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,0.1)'}]},options:{responsive:true}});const ctx2=document.getElementById('priceChartPresale');if(charts.pricePresale)charts.pricePresale.destroy();charts.pricePresale=new Chart(ctx2,{type:'line',data:{labels:months,datasets:[{label:'均價',data:months.map(m=>(monthlyData[m].sum/monthlyData[m].cnt).toFixed(1)),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)'}]},options:{responsive:true}});if(!district){const districtVolume={};filteredPresale.forEach(r=>{districtVolume[r.district]=(districtVolume[r.district]||0)+1;});const sorted=Object.entries(districtVolume).sort((a,b)=>b[1]-a[1]).slice(0,10);const ctx3=document.getElementById('pieChartPresale');if(charts.piePresale)charts.piePresale.destroy();charts.piePresale=new Chart(ctx3,{type:'pie',data:{labels:sorted.map(s=>s[0]),datasets:[{data:sorted.map(s=>s[1]),backgroundColor:['#818cf8','#34d399','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16']}]},options:{responsive:true}});const districtStats={};filteredPresale.forEach(r=>{if(!districtStats[r.district])districtStats[r.district]={sum:0,count:0};districtStats[r.district].sum+=r.unitPrice;districtStats[r.district].count++;});const sorted2=Object.entries(districtStats).map(([d,s])=>({district:d,avg:s.sum/s.count})).sort((a,b)=>b.avg-a.avg).slice(0,10);const ctx4=document.getElementById('barChartPresale');if(charts.barPresale)charts.barPresale.destroy();charts.barPresale=new Chart(ctx4,{type:'bar',data:{labels:sorted2.map(s=>s.district),datasets:[{label:'均價',data:sorted2.map(s=>s.avg.toFixed(1)),backgroundColor:'#818cf8'}]},options:{responsive:true}});}}
 
-        function renderPriceChart(){const ctx=document.getElementById('priceChart');if(charts.price)charts.price.destroy();const monthlyData={};filteredData.forEach(r=>{const month=r.date.substring(0,6);if(!monthlyData[month])monthlyData[month]={presale:{sum:0,count:0},resale:{sum:0,count:0}};monthlyData[month][r.type].sum+=r.unitPrice;monthlyData[month][r.type].count++;});const months=Object.keys(monthlyData).sort();charts.price=new Chart(ctx,{type:'line',data:{labels:months,datasets:[{label:'預售均價',data:months.map(m=>monthlyData[m].presale.count?(monthlyData[m].presale.sum/monthlyData[m].presale.count).toFixed(1):0),borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)'},{label:'中古均價',data:months.map(m=>monthlyData[m].resale.count?(monthlyData[m].resale.sum/monthlyData[m].resale.count).toFixed(1):0),borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)'}]},options:{responsive:true,maintainAspectRatio:true}});}
+        function renderChartsResale(){const district=document.getElementById('districtFilterResale').value;document.getElementById('pieChartDivResale').style.display=district?'none':'block';document.getElementById('barChartDivResale').style.display=district?'none':'block';const monthlyData={};filteredResale.forEach(r=>{const month=r.date.substring(0,6);if(!monthlyData[month])monthlyData[month]={count:0,sum:0,cnt:0};monthlyData[month].count++;monthlyData[month].sum+=r.unitPrice;monthlyData[month].cnt++;});const months=Object.keys(monthlyData).sort();const ctx1=document.getElementById('volumeChartResale');if(charts.volumeResale)charts.volumeResale.destroy();charts.volumeResale=new Chart(ctx1,{type:'line',data:{labels:months,datasets:[{label:'中古量',data:months.map(m=>monthlyData[m].count),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,0.1)'}]},options:{responsive:true}});const ctx2=document.getElementById('priceChartResale');if(charts.priceResale)charts.priceResale.destroy();charts.priceResale=new Chart(ctx2,{type:'line',data:{labels:months,datasets:[{label:'均價',data:months.map(m=>(monthlyData[m].sum/monthlyData[m].cnt).toFixed(1)),borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.1)'}]},options:{responsive:true}});if(!district){const districtVolume={};filteredResale.forEach(r=>{districtVolume[r.district]=(districtVolume[r.district]||0)+1;});const sorted=Object.entries(districtVolume).sort((a,b)=>b[1]-a[1]).slice(0,10);const ctx3=document.getElementById('pieChartResale');if(charts.pieResale)charts.pieResale.destroy();charts.pieResale=new Chart(ctx3,{type:'pie',data:{labels:sorted.map(s=>s[0]),datasets:[{data:sorted.map(s=>s[1]),backgroundColor:['#818cf8','#34d399','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16']}]},options:{responsive:true}});const districtStats={};filteredResale.forEach(r=>{if(!districtStats[r.district])districtStats[r.district]={sum:0,count:0};districtStats[r.district].sum+=r.unitPrice;districtStats[r.district].count++;});const sorted2=Object.entries(districtStats).map(([d,s])=>({district:d,avg:s.sum/s.count})).sort((a,b)=>b.avg-a.avg).slice(0,10);const ctx4=document.getElementById('barChartResale');if(charts.barResale)charts.barResale.destroy();charts.barResale=new Chart(ctx4,{type:'bar',data:{labels:sorted2.map(s=>s.district),datasets:[{label:'均價',data:sorted2.map(s=>s.avg.toFixed(1)),backgroundColor:'#34d399'}]},options:{responsive:true}});}}
 
-        function renderPieChart(){const ctx=document.getElementById('pieChart');if(charts.pie)charts.pie.destroy();const districtVolume={};filteredData.forEach(r=>{districtVolume[r.district]=(districtVolume[r.district]||0)+1;});const sorted=Object.entries(districtVolume).sort((a,b)=>b[1]-a[1]).slice(0,10);charts.pie=new Chart(ctx,{type:'pie',data:{labels:sorted.map(s=>s[0]),datasets:[{data:sorted.map(s=>s[1]),backgroundColor:['#818cf8','#34d399','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16']}]},options:{responsive:true,maintainAspectRatio:true}});}
+        function updateTop5Presale(){const startDate=document.getElementById('top5StartDatePresale').value.replace('-','');const endDate=document.getElementById('top5EndDatePresale').value.replace('-','');const rangeData=presaleData.filter(r=>{if(startDate&&r.date<startDate)return false;if(endDate&&r.date>endDate)return false;return true;});const presaleVolume={};rangeData.filter(r=>r.project!=='未命名').forEach(r=>{presaleVolume[r.project]=(presaleVolume[r.project]||0)+1;});const top5Vol=Object.entries(presaleVolume).sort((a,b)=>b[1]-a[1]).slice(0,5);document.getElementById('top5PresaleVolume').innerHTML=top5Vol.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold">${i+1}. ${item[0]}</div><div class="text-sm text-gray-400">${item[1]} 筆</div></div>`).join('')||'<p class="text-gray-500">暫無</p>';const presalePrice={};rangeData.filter(r=>r.project!=='未命名').forEach(r=>{if(!presalePrice[r.project])presalePrice[r.project]={sum:0,count:0,district:r.district};presalePrice[r.project].sum+=r.unitPrice;presalePrice[r.project].count++;});const top5Price=Object.entries(presalePrice).map(([p,s])=>({project:p,avg:s.sum/s.count,district:s.district})).sort((a,b)=>b.avg-a.avg).slice(0,5);document.getElementById('top5PresalePrice').innerHTML=top5Price.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold">${i+1}. ${item.project}</div><div class="text-sm text-indigo-400">${item.avg.toFixed(1)} 萬/坪</div><div class="text-xs text-gray-400">${item.district}</div></div>`).join('')||'<p class="text-gray-500">暫無</p>';}
 
-        function renderBarChart(){const ctx=document.getElementById('barChart');if(charts.bar)charts.bar.destroy();const districtStats={};filteredData.forEach(r=>{if(!districtStats[r.district])districtStats[r.district]={sum:0,count:0};districtStats[r.district].sum+=r.unitPrice;districtStats[r.district].count++;});const sorted=Object.entries(districtStats).map(([d,s])=>({district:d,avg:s.sum/s.count})).sort((a,b)=>b.avg-a.avg).slice(0,10);charts.bar=new Chart(ctx,{type:'bar',data:{labels:sorted.map(s=>s.district),datasets:[{label:'均價(萬/坪)',data:sorted.map(s=>s.avg.toFixed(1)),backgroundColor:'#818cf8'}]},options:{responsive:true,maintainAspectRatio:true}});}
+        function updateTop5Resale(){const startDate=document.getElementById('top5StartDateResale').value.replace('-','');const endDate=document.getElementById('top5EndDateResale').value.replace('-','');const rangeData=resaleData.filter(r=>{if(startDate&&r.date<startDate)return false;if(endDate&&r.date>endDate)return false;return true;});const resaleVolume={};rangeData.forEach(r=>{resaleVolume[r.district]=(resaleVolume[r.district]||0)+1;});const top5Vol=Object.entries(resaleVolume).sort((a,b)=>b[1]-a[1]).slice(0,5);document.getElementById('top5ResaleVolume').innerHTML=top5Vol.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold">${i+1}. ${item[0]}</div><div class="text-sm text-gray-400">${item[1]} 筆</div></div>`).join('')||'<p class="text-gray-500">暫無</p>';const resalePrice={};rangeData.forEach(r=>{const key=r.location||r.district;if(!resalePrice[key])resalePrice[key]={sum:0,count:0,district:r.district};resalePrice[key].sum+=r.unitPrice;resalePrice[key].count++;});const top5Price=Object.entries(resalePrice).filter(([_,s])=>s.count>=2).map(([l,s])=>({location:l,avg:s.sum/s.count,district:s.district})).sort((a,b)=>b.avg-a.avg).slice(0,5);document.getElementById('top5ResalePrice').innerHTML=top5Price.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold text-sm">${i+1}. ${item.location}</div><div class="text-sm text-purple-400">${item.avg.toFixed(1)} 萬/坪</div><div class="text-xs text-gray-400">${item.district}</div></div>`).join('')||'<p class="text-gray-500">暫無</p>';}
 
-        function updateTop5(){const startDate=document.getElementById('top5StartDate').value.replace('-','');const endDate=document.getElementById('top5EndDate').value.replace('-','');const rangeData=allData.filter(r=>{if(startDate&&r.date<startDate)return false;if(endDate&&r.date>endDate)return false;return true;});const presaleVolume={};rangeData.filter(r=>r.type==='presale'&&r.project!=='未命名').forEach(r=>{presaleVolume[r.project]=(presaleVolume[r.project]||0)+1;});const top5PresaleVol=Object.entries(presaleVolume).sort((a,b)=>b[1]-a[1]).slice(0,5);document.getElementById('top5PresaleVolume').innerHTML=top5PresaleVol.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold">${i+1}. ${item[0]}</div><div class="text-sm text-gray-400">${item[1]} 筆</div></div>`).join('')||'<p class="text-gray-500">暫無數據</p>';const presalePrice={};rangeData.filter(r=>r.type==='presale'&&r.project!=='未命名').forEach(r=>{if(!presalePrice[r.project])presalePrice[r.project]={sum:0,count:0,district:r.district};presalePrice[r.project].sum+=r.unitPrice;presalePrice[r.project].count++;});const top5PresalePrice=Object.entries(presalePrice).map(([p,s])=>({project:p,avg:s.sum/s.count,district:s.district})).sort((a,b)=>b.avg-a.avg).slice(0,5);document.getElementById('top5PresalePrice').innerHTML=top5PresalePrice.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold">${i+1}. ${item.project}</div><div class="text-sm text-indigo-400">${item.avg.toFixed(1)} 萬/坪</div><div class="text-xs text-gray-400">${item.district}</div></div>`).join('')||'<p class="text-gray-500">暫無數據</p>';const resalePrice={};rangeData.filter(r=>r.type==='resale').forEach(r=>{const key=r.location||r.district;if(!resalePrice[key])resalePrice[key]={sum:0,count:0,district:r.district};resalePrice[key].sum+=r.unitPrice;resalePrice[key].count++;});const top5ResalePrice=Object.entries(resalePrice).filter(([_,s])=>s.count>=2).map(([l,s])=>({location:l,avg:s.sum/s.count,district:s.district})).sort((a,b)=>b.avg-a.avg).slice(0,5);document.getElementById('top5ResalePrice').innerHTML=top5ResalePrice.map((item,i)=>`<div class="mb-3 p-3 bg-slate-700 rounded-lg"><div class="font-bold text-sm">${i+1}. ${item.location}</div><div class="text-sm text-purple-400">${item.avg.toFixed(1)} 萬/坪</div><div class="text-xs text-gray-400">${item.district}</div></div>`).join('')||'<p class="text-gray-500">暫無數據</p>';}
+        function runAIAnalysisPresale(){if(!filteredPresale.length){document.getElementById('aiSummaryPresale').innerHTML='📊 暫無數據';document.getElementById('deepAnalysisPresale').innerHTML='';return;}const avgPrice=filteredPresale.reduce((sum,r)=>sum+r.unitPrice,0)/filteredPresale.length;const summary=`共 <strong>${filteredPresale.length}</strong> 筆預售交易 ｜ 平均單價 <strong>${avgPrice.toFixed(1)} 萬/坪</strong>`;document.getElementById('aiSummaryPresale').innerHTML=summary;const analysis=`<div class="space-y-3"><p>預售屋市場呈現${avgPrice>50?'高單價區段，顯示區域定位高端':'親民價格帶，首購族群為主力'}。建議購屋者關注建案周邊交通與生活機能，確保長期增值潛力。</p></div>`;document.getElementById('deepAnalysisPresale').innerHTML=analysis;}
 
-        function runAIAnalysis(){if(!filteredData.length){document.getElementById('aiSummary').innerHTML='📊 請上傳數據';document.getElementById('deepAnalysis').innerHTML='';return;}const presale=filteredData.filter(r=>r.type==='presale');const resale=filteredData.filter(r=>r.type==='resale');const avgPrice=filteredData.reduce((sum,r)=>sum+r.unitPrice,0)/filteredData.length;const district=document.getElementById('districtFilter').value;const summary=`共 <strong>${filteredData.length}</strong> 筆（預售 ${presale.length} / 中古 ${resale.length}）｜均價 <strong>${avgPrice.toFixed(1)} 萬/坪</strong> ｜${district?`${district}`:'全區域'}`;document.getElementById('aiSummary').innerHTML=summary;const analysis=`<div class="space-y-4"><div class="border-l-4 border-indigo-500 pl-4"><h3 class="font-bold mb-2">📊 結構分析</h3><p>預售/中古比 ${presale.length}:${resale.length}，${presale.length>resale.length?'新建案供給充沛':'中古流通活絡'}。</p></div><div class="border-l-4 border-yellow-500 pl-4"><h3 class="font-bold mb-2">💡 價格建議</h3><p>${avgPrice>50?'單價高水位，建議評估區域潛力與交通便利性':'單價親民，適合首購置產，關注周邊建設'}。</p></div></div>`;document.getElementById('deepAnalysis').innerHTML=analysis;}
+        function runAIAnalysisResale(){if(!filteredResale.length){document.getElementById('aiSummaryResale').innerHTML='📊 暫無數據';document.getElementById('deepAnalysisResale').innerHTML='';return;}const avgPrice=filteredResale.reduce((sum,r)=>sum+r.unitPrice,0)/filteredResale.length;const summary=`共 <strong>${filteredResale.length}</strong> 筆中古交易 ｜ 平均單價 <strong>${avgPrice.toFixed(1)} 萬/坪</strong>`;document.getElementById('aiSummaryResale').innerHTML=summary;const analysis=`<div class="space-y-3"><p>中古屋市場流通性${filteredResale.length>100?'高，顯示區域成熟穩定':'適中，買賣雙方較為審慎'}。平均單價 ${avgPrice.toFixed(1)} 萬/坪，${avgPrice>40?'接近區域天花板，建議評估性價比':'具備議價空間，適合首購進場'}。</p></div>`;document.getElementById('deepAnalysisResale').innerHTML=analysis;}
 
-        function updateDataInfo(){if(!allData.length){document.getElementById('dataInfo').innerHTML='';return;}const dates=allData.map(r=>r.date).sort();const startDate=dates[0];const endDate=dates[dates.length-1];const now=new Date().toLocaleString('zh-TW');document.getElementById('dataInfo').innerHTML=`📅 ${startDate}~${endDate} ｜ 🔄 ${now} ｜ 📊 ${allData.length.toLocaleString()}`;}
+        function updateDataInfo(){if(!presaleData.length&&!resaleData.length){document.getElementById('dataInfo').innerHTML='';return;}const allDates=[...presaleData.map(r=>r.date),...resaleData.map(r=>r.date)].sort();const now=new Date().toLocaleString('zh-TW');document.getElementById('dataInfo').innerHTML=`📅 ${allDates[0]}~${allDates[allDates.length-1]} ｜ 🔄 ${now} ｜ 📊 預售 ${presaleData.length.toLocaleString()} / 中古 ${resaleData.length.toLocaleString()}`;}
 
         function setStatus(msg){document.getElementById('status').textContent=msg;}
 
-        (async()=>{db=await initDB();allData=await loadFromDB();populateFilters();if(allData.length===0){setStatus('🔄 同步中...');try{const[presale,resale]=await Promise.all([fetchCSV(GITHUB_PRESALE),fetchCSV(GITHUB_RESALE)]);const presaleParsed=presale.map(r=>parseRow(r,'presale')).filter(r=>r);const resaleParsed=resale.map(r=>parseRow(r,'resale')).filter(r=>r);const saved=await saveToDB([...presaleParsed,...resaleParsed]);allData=await loadFromDB();populateFilters();applyFilters();setStatus(`✅ ${saved} 筆`);}catch(error){setStatus('⚠️ 失敗');}}else{applyFilters();setStatus(`✅ ${allData.length} 筆`);}})();
+        (async()=>{db=await initDB();presaleData=await loadFromDB('presale');resaleData=await loadFromDB('resale');populateFilters();if(presaleData.length===0&&resaleData.length===0){setStatus('🔄 自動同步中...');try{const[presale,resale]=await Promise.all([fetchCSV(GITHUB_PRESALE),fetchCSV(GITHUB_RESALE)]);const presaleParsed=presale.map(parsePresale).filter(r=>r);const resaleParsed=resale.map(parseResale).filter(r=>r);const savedPresale=await saveToDB(presaleParsed,'presale');const savedResale=await saveToDB(resaleParsed,'resale');presaleData=await loadFromDB('presale');resaleData=await loadFromDB('resale');populateFilters();applyFiltersPresale();applyFiltersResale();setStatus(`✅ 預售 ${savedPresale} / 中古 ${savedResale}`);}catch(error){setStatus('⚠️ '+error.message);}}else{applyFiltersPresale();applyFiltersResale();setStatus(`✅ 已載入`);}})();
     </script>
 </body>
 </html>
