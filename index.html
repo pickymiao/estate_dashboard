@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESTATE PRO v44.0</title>
+    <title>ESTATE PRO v44.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
@@ -12,7 +12,7 @@
     <div class="container mx-auto px-4 py-6 max-w-7xl">
         <!-- Header -->
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-indigo-400 mb-2">ESTATE PRO v44.0</h1>
+            <h1 class="text-3xl font-bold text-indigo-400 mb-2">ESTATE PRO v44.2</h1>
             <div class="flex flex-wrap gap-3">
                 <button onclick="syncData()" class="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg font-semibold">
                     🔄 同步最新數據
@@ -124,7 +124,7 @@
         function generateUID(row) {
             const id = row.rps26 || row.rps27;
             if (id) return id;
-            const str = `${row.rps03}_${row.rps05}_${row.rps08}_${row.rps09}`;
+            const str = `${row.district}_${row.rps05}_${row.rps21_amountsunitdollars}_${row.rps11}`;
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
                 hash = ((hash << 5) - hash) + str.charCodeAt(i);
@@ -135,10 +135,11 @@
 
         // Parse and clean data
         function parseRow(row) {
-            const price = parseFloat(row.rps08) || 0;
-            const rooms = parseInt(row.rps16) || 0;
+            const price = parseFloat(row.rps21_amountsunitdollars) / 10000 || 0; // Convert to 萬
+            const unitPrice = parseFloat(row.rps22_amountsunitdollars) / 10000 || 0; // Convert to 萬/坪
+            const rooms = parseInt(row.rps16_quantity) || 0;
             const usage = row.rps12 || '';
-            const age = parseInt(row.rps18) || 0;
+            const age = parseInt(row.rps18_quantity) || 0;
             
             // Filter: 住家用 only, outlier removal
             if (!usage.includes('住家用')) return null;
@@ -146,14 +147,14 @@
             
             return {
                 uid: generateUID(row),
-                district: row.rps03 || '',
+                district: row.district || '',
                 date: row.rps05 || '',
                 price: price,
-                unitPrice: parseFloat(row.rps09) || 0,
+                unitPrice: unitPrice,
                 rooms: rooms,
                 age: age,
-                project: row.rps10 || '未命名',
-                location: row.rps11 || '',
+                project: row.rps27 || '未命名',
+                location: row.rps03_area || '',
                 usage: usage
             };
         }
