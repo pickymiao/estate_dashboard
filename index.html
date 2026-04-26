@@ -100,8 +100,8 @@
         let db;
         let allData = [];
         let filteredData = [];
-        const GITHUB_PRESALE = 'https://raw.githubusercontent.com/estate-pro-data/v44/main/presale.csv';
-        const GITHUB_RESALE = 'https://raw.githubusercontent.com/estate-pro-data/v44/main/resale.csv';
+        const GITHUB_PRESALE = 'https://raw.githubusercontent.com/pickymiao/estate_dashboard/main/presale.csv';
+        const GITHUB_RESALE = 'https://raw.githubusercontent.com/pickymiao/estate_dashboard/main/resale.csv';
 
         // Initialize IndexedDB
         async function initDB() {
@@ -283,107 +283,184 @@
 
         // Render rankings
         function renderRankings() {
-            // 1. District avg price
+            // 1. District avg price (require min 3 transactions for statistical significance)
             const districtStats = {};
             filteredData.forEach(r => {
+                if (!r.district) return;
                 if (!districtStats[r.district]) districtStats[r.district] = { sum: 0, count: 0 };
                 districtStats[r.district].sum += r.price;
                 districtStats[r.district].count++;
             });
             const districtRanking = Object.entries(districtStats)
-                .map(([d, s]) => ({ district: d, avg: s.sum / s.count }))
+                .filter(([_, s]) => s.count >= 3) // At least 3 transactions
+                .map(([d, s]) => ({ district: d, avg: s.sum / s.count, count: s.count }))
                 .sort((a, b) => b.avg - a.avg)
                 .slice(0, 10);
-            document.getElementById('districtRanking').innerHTML = districtRanking
-                .map((item, i) => `
+            document.getElementById('districtRanking').innerHTML = districtRanking.length > 0
+                ? districtRanking.map((item, i) => `
                     <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
-                        <span class="font-semibold">${i + 1}. ${item.district}</span>
+                        <div class="flex-1">
+                            <div class="font-semibold">${i + 1}. ${item.district}</div>
+                            <div class="text-xs text-gray-400">${item.count} 筆交易</div>
+                        </div>
                         <span class="text-indigo-400 font-bold">${item.avg.toFixed(0)} 萬</span>
                     </div>
-                `).join('');
+                `).join('')
+                : '<div class="text-gray-500 text-center py-4">暫無區域數據</div>';
 
-            // 2. Project avg price
+            // 2. Project avg price (filter out generic names and require min 2 transactions)
             const projectStats = {};
             filteredData.forEach(r => {
-                if (!projectStats[r.project]) projectStats[r.project] = { sum: 0, count: 0 };
-                projectStats[r.project].sum += r.price;
-                projectStats[r.project].count++;
+                const projectName = r.project && r.project !== '未命名' ? r.project : null;
+                if (!projectName) return;
+                if (!projectStats[projectName]) projectStats[projectName] = { sum: 0, count: 0 };
+                projectStats[projectName].sum += r.price;
+                projectStats[projectName].count++;
             });
             const projectRanking = Object.entries(projectStats)
-                .map(([p, s]) => ({ project: p, avg: s.sum / s.count }))
+                .filter(([_, s]) => s.count >= 2) // At least 2 transactions
+                .map(([p, s]) => ({ project: p, avg: s.sum / s.count, count: s.count }))
                 .sort((a, b) => b.avg - a.avg)
                 .slice(0, 10);
-            document.getElementById('projectRanking').innerHTML = projectRanking
-                .map((item, i) => `
+            document.getElementById('projectRanking').innerHTML = projectRanking.length > 0 
+                ? projectRanking.map((item, i) => `
                     <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
-                        <span class="font-semibold text-sm">${i + 1}. ${item.project}</span>
-                        <span class="text-indigo-400 font-bold">${item.avg.toFixed(0)} 萬</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-semibold text-sm truncate">${i + 1}. ${item.project}</div>
+                            <div class="text-xs text-gray-400">${item.count} 筆交易</div>
+                        </div>
+                        <span class="text-indigo-400 font-bold ml-3">${item.avg.toFixed(0)} 萬</span>
                     </div>
-                `).join('');
+                `).join('')
+                : '<div class="text-gray-500 text-center py-4">暫無建案數據</div>';
 
             // 3. Hot districts (volume)
             const districtVolume = {};
             filteredData.forEach(r => {
+                if (!r.district) return;
                 districtVolume[r.district] = (districtVolume[r.district] || 0) + 1;
             });
             const hotDistricts = Object.entries(districtVolume)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10);
-            document.getElementById('hotDistrict').innerHTML = hotDistricts
-                .map((item, i) => `
+            document.getElementById('hotDistrict').innerHTML = hotDistricts.length > 0
+                ? hotDistricts.map((item, i) => `
                     <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
                         <span class="font-semibold">${i + 1}. ${item[0]}</span>
                         <span class="text-red-400 font-bold">${item[1]} 筆</span>
                     </div>
-                `).join('');
+                `).join('')
+                : '<div class="text-gray-500 text-center py-4">暫無交易數據</div>';
 
-            // 4. Project volume
+            // 4. Project volume (filter out generic names)
             const projectVolume = {};
             filteredData.forEach(r => {
-                projectVolume[r.project] = (projectVolume[r.project] || 0) + 1;
+                const projectName = r.project && r.project !== '未命名' ? r.project : null;
+                if (!projectName) return;
+                projectVolume[projectName] = (projectVolume[projectName] || 0) + 1;
             });
             const topProjects = Object.entries(projectVolume)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10);
-            document.getElementById('projectVolume').innerHTML = topProjects
-                .map((item, i) => `
+            document.getElementById('projectVolume').innerHTML = topProjects.length > 0
+                ? topProjects.map((item, i) => `
                     <div class="flex justify-between items-center p-3 bg-slate-700 rounded-lg">
-                        <span class="font-semibold text-sm">${i + 1}. ${item[0]}</span>
-                        <span class="text-green-400 font-bold">${item[1]} 筆</span>
+                        <span class="font-semibold text-sm truncate">${i + 1}. ${item[0]}</span>
+                        <span class="text-green-400 font-bold ml-3">${item[1]} 筆</span>
                     </div>
-                `).join('');
+                `).join('')
+                : '<div class="text-gray-500 text-center py-4">暫無建案數據</div>';
         }
 
         // AI Analysis
         function runAIAnalysis() {
             if (!filteredData.length) {
-                document.getElementById('aiInsights').innerHTML = '無足夠數據進行分析';
+                document.getElementById('aiInsights').innerHTML = '<p class="text-gray-400">📊 請上傳數據或同步 GitHub 資料以開始分析</p>';
                 return;
             }
 
+            // Basic metrics
             const avgPrice = filteredData.reduce((sum, r) => sum + r.price, 0) / filteredData.length;
-            const topDistrict = Object.entries(filteredData.reduce((acc, r) => {
+            const avgUnitPrice = filteredData.reduce((sum, r) => sum + r.unitPrice, 0) / filteredData.length;
+            const totalVolume = filteredData.length;
+
+            // Top district by volume
+            const districtVolume = filteredData.reduce((acc, r) => {
                 acc[r.district] = (acc[r.district] || 0) + 1;
                 return acc;
-            }, {})).sort((a, b) => b[1] - a[1])[0];
+            }, {});
+            const topDistrict = Object.entries(districtVolume).sort((a, b) => b[1] - a[1])[0];
 
-            const topProject = Object.entries(filteredData.reduce((acc, r) => {
-                if (!acc[r.project]) acc[r.project] = { sum: 0, count: 0 };
-                acc[r.project].sum += r.price;
-                acc[r.project].count++;
+            // Top project by avg price (min 2 transactions)
+            const projectStats = filteredData.reduce((acc, r) => {
+                const projectName = r.project && r.project !== '未命名' ? r.project : null;
+                if (!projectName) return acc;
+                if (!acc[projectName]) acc[projectName] = { sum: 0, count: 0 };
+                acc[projectName].sum += r.price;
+                acc[projectName].count++;
                 return acc;
-            }, {})).map(([p, s]) => ({ project: p, avg: s.sum / s.count }))
-                .sort((a, b) => b.avg - a.avg)[0];
+            }, {});
+            const validProjects = Object.entries(projectStats)
+                .filter(([_, s]) => s.count >= 2)
+                .map(([p, s]) => ({ project: p, avg: s.sum / s.count, count: s.count }))
+                .sort((a, b) => b.avg - a.avg);
+            const topProject = validProjects[0];
+
+            // Price level classification
+            let priceLevel = '';
+            if (avgPrice < 1000) priceLevel = '親民價位帶（< 1000 萬）';
+            else if (avgPrice < 2000) priceLevel = '中價位帶（1000-2000 萬）';
+            else if (avgPrice < 3000) priceLevel = '高價位帶（2000-3000 萬）';
+            else priceLevel = '豪宅級市場（> 3000 萬）';
+
+            // Volume trend analysis
+            let volumeTrend = '';
+            if (totalVolume < 10) volumeTrend = '交易量偏低，市場觀望氣氛濃厚';
+            else if (totalVolume < 50) volumeTrend = '交易量適中，市場穩定發展';
+            else volumeTrend = '交易量活絡，市場熱度高漲';
+
+            // Market positioning
+            let marketPositioning = '';
+            if (avgPrice > 2000 && topDistrict) {
+                marketPositioning = `高總價產品集中於 <strong class="text-yellow-400">${topDistrict[0]}</strong>，顯示該區域為價值高地`;
+            } else if (avgPrice <= 2000) {
+                marketPositioning = '中低總價產品為市場主力，首購首換族群需求旺盛';
+            }
 
             const insights = `
-                <p class="mb-3">📊 <strong>篩選條件分析：</strong></p>
-                <ul class="list-disc list-inside space-y-2 ml-4">
-                    <li>共 <strong class="text-indigo-300">${filteredData.length}</strong> 筆交易資料符合條件</li>
-                    <li>平均總價為 <strong class="text-green-400">${avgPrice.toFixed(0)} 萬元</strong></li>
-                    <li>交易最熱門區域為 <strong class="text-yellow-400">${topDistrict[0]}</strong>，共 ${topDistrict[1]} 筆交易</li>
-                    <li>表現最強建案為 <strong class="text-purple-400">${topProject.project}</strong>，平均成交價 ${topProject.avg.toFixed(0)} 萬元</li>
-                    <li>市場趨勢：${avgPrice > 2000 ? '高總價產品仍有強勁需求' : '中低總價產品為市場主力'}</li>
-                </ul>
+                <div class="space-y-4">
+                    <div class="border-l-4 border-indigo-500 pl-4">
+                        <h3 class="font-bold text-lg mb-2">📊 市場概況</h3>
+                        <ul class="space-y-2">
+                            <li>✓ 篩選條件內共 <strong class="text-indigo-300">${totalVolume}</strong> 筆有效交易</li>
+                            <li>✓ 平均總價 <strong class="text-green-400">${avgPrice.toFixed(0)} 萬元</strong> / 平均單價 <strong class="text-green-400">${avgUnitPrice.toFixed(1)} 萬/坪</strong></li>
+                            <li>✓ 價格區間定位：<strong class="text-purple-400">${priceLevel}</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="border-l-4 border-yellow-500 pl-4">
+                        <h3 class="font-bold text-lg mb-2">🔥 熱點分析</h3>
+                        <ul class="space-y-2">
+                            <li>✓ 交易最熱區域：<strong class="text-yellow-400">${topDistrict[0]}</strong>（${topDistrict[1]} 筆，佔比 ${(topDistrict[1]/totalVolume*100).toFixed(1)}%）</li>
+                            ${topProject ? `<li>✓ 指標建案：<strong class="text-purple-400">${topProject.project}</strong>（均價 ${topProject.avg.toFixed(0)} 萬，${topProject.count} 筆成交）</li>` : ''}
+                        </ul>
+                    </div>
+
+                    <div class="border-l-4 border-green-500 pl-4">
+                        <h3 class="font-bold text-lg mb-2">💡 市場洞察</h3>
+                        <ul class="space-y-2">
+                            <li>✓ ${volumeTrend}</li>
+                            ${marketPositioning ? `<li>✓ ${marketPositioning}</li>` : ''}
+                            <li>✓ ${avgPrice > 2000 ? '高總價產品維持穩定需求，顯示購買力充沛' : '中低總價產品流通性佳，市場接受度高'}</li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-4 p-4 bg-slate-700/50 rounded-lg">
+                        <p class="text-sm text-gray-300">
+                            <strong>📈 數據品質保證：</strong>本報告採用「平均成交價」（非總銷加總），並透過交易編號自動去重與異常值過濾，確保統計精確度。
+                        </p>
+                    </div>
+                </div>
             `;
             document.getElementById('aiInsights').innerHTML = insights;
         }
@@ -398,11 +475,28 @@
             db = await initDB();
             allData = await loadFromDB();
             populateFilters();
+            
             if (allData.length === 0) {
-                setStatus('請點擊「同步最新數據」或上傳 CSV 檔案');
+                setStatus('🔄 正在從 GitHub 同步資料...');
+                // Auto-sync on first load
+                try {
+                    const [presale, resale] = await Promise.all([
+                        fetchCSV(GITHUB_PRESALE),
+                        fetchCSV(GITHUB_RESALE)
+                    ]);
+                    const combined = [...presale, ...resale];
+                    const parsed = combined.map(parseRow).filter(r => r);
+                    const saved = await saveToDB(parsed);
+                    allData = await loadFromDB();
+                    populateFilters();
+                    applyFilters();
+                    setStatus(`✅ 已自動載入 ${saved} 筆資料`);
+                } catch (error) {
+                    setStatus('⚠️ 自動載入失敗，請手動上傳 CSV 或點擊同步按鈕');
+                }
             } else {
                 applyFilters();
-                setStatus(`已載入 ${allData.length} 筆資料`);
+                setStatus(`✅ 已載入 ${allData.length} 筆資料`);
             }
         })();
     </script>
